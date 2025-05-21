@@ -1,8 +1,9 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, MessageCircle } from 'lucide-react';
-import RiskTag from './RiskTag';
+import RiskTag, { RiskLevel } from './RiskTag';
 import { Link } from 'react-router-dom';
 
 export interface Report {
@@ -10,7 +11,7 @@ export interface Report {
   title: string;
   content: string;
   category: string;
-  riskLevel: string;
+  riskLevel: RiskLevel;
   reportCount: number;
   timestamp: any;
   reporterName?: string;

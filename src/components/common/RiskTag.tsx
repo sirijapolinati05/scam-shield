@@ -2,7 +2,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-type RiskLevel = 'high' | 'medium' | 'low';
+export type RiskLevel = 'high' | 'medium' | 'low';
 
 interface RiskTagProps {
   level: RiskLevel;

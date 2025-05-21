@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import RiskTag from '@/components/common/RiskTag';
+import RiskTag, { RiskLevel } from '@/components/common/RiskTag';
 import { AlertCircle, Calendar, MessageCircle, Share2, User } from 'lucide-react';
 import { doc, getDoc, collection, query, where, limit, getDocs, Timestamp, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -42,7 +42,7 @@ const ReportDetail: React.FC = () => {
             title: data.title || 'Untitled Report',
             content: data.content || 'No content provided',
             category: data.category || 'Uncategorized',
-            riskLevel: data.riskLevel || 'medium',
+            riskLevel: (data.riskLevel as RiskLevel) || 'medium',
             reportCount: data.reportCount || 1,
             timestamp: data.timestamp || Timestamp.now(),
             reporterName: data.reporterName,
