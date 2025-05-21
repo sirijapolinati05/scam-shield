@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Briefcase, CreditCard, Globe, Gift, Dice } from 'lucide-react';
+import { Briefcase, CreditCard, Globe, Gift, Dices } from 'lucide-react';
 import CategoryCard from '@/components/common/CategoryCard';
 import ReportCard, { Report } from '@/components/common/ReportCard';
 import Layout from '@/components/layout/Layout';
@@ -91,7 +91,7 @@ const Home: React.FC = () => {
     { title: 'Banking/OTP', icon: <CreditCard className="h-5 w-5" />, link: "/explorer?category=banking", color: "bg-red-100 text-red-600", bgColor: "bg-red-50" },
     { title: 'Fake Sites', icon: <Globe className="h-5 w-5" />, link: "/explorer?category=website", color: "bg-green-100 text-green-600", bgColor: "bg-green-50" },
     { title: 'Lottery', icon: <Gift className="h-5 w-5" />, link: "/explorer?category=lottery", color: "bg-yellow-100 text-yellow-600", bgColor: "bg-yellow-50" },
-    { title: 'Betting Apps', icon: <Dice className="h-5 w-5" />, link: "/explorer?category=betting", color: "bg-purple-100 text-purple-600", bgColor: "bg-purple-50" }
+    { title: 'Betting Apps', icon: <Dices className="h-5 w-5" />, link: "/explorer?category=betting", color: "bg-purple-100 text-purple-600", bgColor: "bg-purple-50" }
   ];
 
   return (

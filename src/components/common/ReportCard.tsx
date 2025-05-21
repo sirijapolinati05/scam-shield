@@ -1,10 +1,8 @@
-
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Calendar, MessageCircle } from 'lucide-react';
 import RiskTag from './RiskTag';
-import { Button } from '@/components/ui/button';
-import { ExternalLink, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export interface Report {
@@ -12,52 +10,52 @@ export interface Report {
   title: string;
   content: string;
   category: string;
-  riskLevel: 'high' | 'medium' | 'low';
+  riskLevel: string;
   reportCount: number;
   timestamp: any;
   reporterName?: string;
+  contactInfo?: string;
+  screenshotUrl?: string;
 }
+
+const formatDate = (timestamp: any) => {
+  if (!timestamp) return 'Unknown date';
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return date.toLocaleDateString();
+};
 
 interface ReportCardProps {
   report: Report;
 }
 
 const ReportCard: React.FC<ReportCardProps> = ({ report }) => {
-  const formatDate = (timestamp: any) => {
-    if (!timestamp) return 'Unknown date';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString();
-  };
-
   return (
-    <Card className="scam-shield-card overflow-hidden">
-      <CardHeader className="p-4 pb-3">
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-base font-semibold truncate pr-2">{report.title}</CardTitle>
-          <RiskTag level={report.riskLevel} />
+    <Card className="hover:shadow-md transition-shadow duration-300">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-semibold truncate">{report.title}</CardTitle>
+          <Badge variant="secondary">{report.category}</Badge>
         </div>
       </CardHeader>
-      <CardContent className="p-4 pt-0 pb-2">
-        <p className="text-sm text-gray-600 line-clamp-2">{report.content}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Badge variant="outline" className="bg-accent">
-            {report.category}
-          </Badge>
-          <Badge variant="outline" className="bg-accent flex items-center">
-            <MessageCircle className="h-3 w-3 mr-1" /> {report.reportCount} reports
-          </Badge>
-          <Badge variant="outline" className="bg-accent">
+      <CardContent className="space-y-2">
+        <p className="text-sm text-gray-500 truncate">{report.content}</p>
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center text-gray-400">
+            <Calendar className="h-3 w-3 mr-1" />
             {formatDate(report.timestamp)}
-          </Badge>
+          </div>
+          <div className="flex items-center text-gray-400">
+            <MessageCircle className="h-3 w-3 mr-1" />
+            {report.reportCount} reports
+          </div>
+        </div>
+        <div className="flex justify-between items-center">
+          <RiskTag level={report.riskLevel} />
+          <Link to={`/report/${report.id}`} className="text-blue-500 hover:underline text-sm">
+            Read more
+          </Link>
         </div>
       </CardContent>
-      <CardFooter className="p-4 pt-2 flex justify-end">
-        <Link to={`/report/${report.id}`}>
-          <Button variant="outline" size="sm" className="text-xs">
-            View Details <ExternalLink className="h-3 w-3 ml-1" />
-          </Button>
-        </Link>
-      </CardFooter>
     </Card>
   );
 };

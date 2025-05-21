@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -14,11 +13,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/components/ui/use-toast";
 import ReportCard, { Report } from '@/components/common/ReportCard';
 
+// Extend the Report type to include the additional fields used in this component
+interface ExtendedReport extends Report {
+  contactInfo?: string;
+  screenshotUrl?: string;
+}
+
 const ReportDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { currentUser } = useAuth();
   const { toast } = useToast();
-  const [report, setReport] = useState<Report | null>(null);
+  const [report, setReport] = useState<ExtendedReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [similarReports, setSimilarReports] = useState<Report[]>([]);
 
