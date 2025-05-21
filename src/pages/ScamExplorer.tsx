@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Input } from '@/components/ui/input';
@@ -15,8 +16,8 @@ const ScamExplorer: React.FC = () => {
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [riskFilter, setRiskFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [riskFilter, setRiskFilter] = useState('all');
   const [sortBy, setSortBy] = useState('latest');
 
   const loadReports = async (isFirstLoad = false) => {
@@ -27,12 +28,12 @@ const ScamExplorer: React.FC = () => {
       let q = query(reportsRef, where('status', '==', 'approved'));
       
       // Apply category filter if selected
-      if (categoryFilter) {
+      if (categoryFilter && categoryFilter !== 'all') {
         q = query(q, where('category', '==', categoryFilter));
       }
       
       // Apply risk filter if selected
-      if (riskFilter) {
+      if (riskFilter && riskFilter !== 'all') {
         q = query(q, where('riskLevel', '==', riskFilter));
       }
       
@@ -140,11 +141,11 @@ const ScamExplorer: React.FC = () => {
         // Apply filters to dummy data
         let filteredReports = dummyReports;
         
-        if (categoryFilter) {
+        if (categoryFilter && categoryFilter !== 'all') {
           filteredReports = filteredReports.filter(report => report.category === categoryFilter);
         }
         
-        if (riskFilter) {
+        if (riskFilter && riskFilter !== 'all') {
           filteredReports = filteredReports.filter(report => report.riskLevel === riskFilter);
         }
         
@@ -195,8 +196,8 @@ const ScamExplorer: React.FC = () => {
   // Handle filter reset
   const resetFilters = () => {
     setSearchTerm('');
-    setCategoryFilter('');
-    setRiskFilter('');
+    setCategoryFilter('all');
+    setRiskFilter('all');
     setSortBy('latest');
     loadReports(true);
   };
@@ -223,7 +224,7 @@ const ScamExplorer: React.FC = () => {
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 <SelectItem value="job">Job Scams</SelectItem>
                 <SelectItem value="banking">OTP/Banking</SelectItem>
                 <SelectItem value="website">Fake Websites</SelectItem>
@@ -240,7 +241,7 @@ const ScamExplorer: React.FC = () => {
                 <SelectValue placeholder="Filter by risk" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Risk Levels</SelectItem>
+                <SelectItem value="all">All Risk Levels</SelectItem>
                 <SelectItem value="high">High Risk</SelectItem>
                 <SelectItem value="medium">Medium Risk</SelectItem>
                 <SelectItem value="low">Low Risk</SelectItem>
