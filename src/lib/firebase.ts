@@ -3,13 +3,15 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
+// Your web app's Firebase configuration
+// Replace these with your actual Firebase project credentials
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyA8B1gjrBinlonA0qBSQdIOY33-JTQxmEk",
+  authDomain: "scamshield-app.firebaseapp.com",
+  projectId: "scamshield-app",
+  storageBucket: "scamshield-app.appspot.com",
+  messagingSenderId: "246812186983",
+  appId: "1:246812186983:web:a85b4ef9b4d7cbeb53a6a4"
 };
 
 // Initialize Firebase
