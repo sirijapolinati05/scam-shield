@@ -9,9 +9,11 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   updateProfile,
-  User
+  User,
+  browserSessionPersistence,
+  setPersistence
 } from 'firebase/auth';
-import { app } from '../lib/firebase';
+import { app, auth } from '../lib/firebase';
 import { useToast } from "@/components/ui/use-toast";
 
 interface AuthContextType {
@@ -29,7 +31,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const auth = getAuth(app);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -38,10 +39,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return unsubscribe;
-  }, [auth]);
+  }, []);
 
   const signUp = async (email: string, password: string, username: string) => {
     try {
+      // Use session persistence to avoid token refresh issues during development
+      await setPersistence(auth, browserSessionPersistence);
+      
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       // Update the user's display name
       if (auth.currentUser) {
@@ -69,6 +73,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      // Use session persistence to avoid token refresh issues during development
+      await setPersistence(auth, browserSessionPersistence);
+      
       await signInWithEmailAndPassword(auth, email, password);
       toast({
         title: "Welcome back!",
@@ -86,17 +93,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
+      // Use session persistence to avoid token refresh issues during development
+      await setPersistence(auth, browserSessionPersistence);
+      
       const provider = new GoogleAuthProvider();
+      // Add custom parameters to the Google provider
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
       await signInWithPopup(auth, provider);
       toast({
         title: "Welcome!",
         description: "Successfully signed in with Google.",
       });
     } catch (error: any) {
+      console.error("Google sign in error:", error);
+      const errorCode = error.code;
+      let errorMessage = error.message;
+      
+      // Provide more specific error messages
+      if (errorCode === 'auth/unauthorised-domain') {
+        errorMessage = 'This domain is not authorized for authentication. Please update your Firebase console settings.';
+      }
+      
       toast({
         variant: "destructive",
         title: "Google sign in failed",
-        description: error.message,
+        description: errorMessage,
       });
       throw error;
     }
