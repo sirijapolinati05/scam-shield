@@ -13,6 +13,8 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useToast } from "@/components/ui/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CheckCircle } from 'lucide-react';
 
 const ReportScam: React.FC = () => {
   const { currentUser } = useAuth();
@@ -26,6 +28,33 @@ const ReportScam: React.FC = () => {
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [showThankYou, setShowThankYou] = useState(false);
+  const [contactInfoError, setContactInfoError] = useState<string | null>(null);
+
+  const validatePhoneNumber = (phoneNumber: string): boolean => {
+    // If empty, consider it valid (since it's optional)
+    if (!phoneNumber) return true;
+    
+    // Check if it starts with a country code (+ followed by 1-3 digits)
+    const hasCountryCode = /^\+\d{1,3}/.test(phoneNumber);
+    
+    if (!hasCountryCode) {
+      setContactInfoError("Please enter the phone number with a valid country code (e.g., +91, +1).");
+      return false;
+    }
+    
+    // Check if it has exactly 10 digits after the country code
+    const digitsAfterCode = phoneNumber.substring(phoneNumber.indexOf('+') + 1).replace(/\D/g, '');
+    const codeDigits = digitsAfterCode.length - 10;
+    
+    if (codeDigits < 0 || digitsAfterCode.length - codeDigits !== 10) {
+      setContactInfoError("Phone number must contain exactly 10 digits after the country code.");
+      return false;
+    }
+    
+    setContactInfoError(null);
+    return true;
+  };
 
   const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -38,6 +67,15 @@ const ReportScam: React.FC = () => {
         setScreenshotPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleContactInfoChange = (value: string) => {
+    setContactInfo(value);
+    if (value && (value.includes('+') || value.match(/\d{10}/))) {
+      validatePhoneNumber(value);
+    } else {
+      setContactInfoError(null);
     }
   };
 
@@ -60,6 +98,11 @@ const ReportScam: React.FC = () => {
         description: "Please fill in all required fields.",
         variant: "destructive"
       });
+      return;
+    }
+    
+    // Validate contact info if it's a phone number
+    if (contactInfo && !validatePhoneNumber(contactInfo)) {
       return;
     }
     
@@ -92,13 +135,8 @@ const ReportScam: React.FC = () => {
       // Save report to Firestore
       const docRef = await addDoc(collection(db, 'reports'), reportData);
       
-      toast({
-        title: "Report submitted",
-        description: "Thank you for helping keep others safe!",
-      });
-      
-      // Navigate to the submitted report
-      navigate(`/report/${docRef.id}`);
+      // Show thank you dialog instead of toast
+      setShowThankYou(true);
       
     } catch (error) {
       console.error("Error submitting report:", error);
@@ -110,6 +148,12 @@ const ReportScam: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCloseThankYou = () => {
+    setShowThankYou(false);
+    // Navigate to home or reports list
+    navigate('/');
   };
 
   return (
@@ -172,10 +216,13 @@ const ReportScam: React.FC = () => {
                 <Label htmlFor="contactInfo">Related Phone/URL (Optional)</Label>
                 <Input
                   id="contactInfo"
-                  placeholder="Phone number or website URL used in the scam"
+                  placeholder="Phone number with country code (e.g., +91xxxxxxxxxx) or website URL"
                   value={contactInfo}
-                  onChange={(e) => setContactInfo(e.target.value)}
+                  onChange={(e) => handleContactInfoChange(e.target.value)}
                 />
+                {contactInfoError && (
+                  <p className="text-sm text-red-500 mt-1">{contactInfoError}</p>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -205,10 +252,30 @@ const ReportScam: React.FC = () => {
           </CardContent>
         </Card>
         
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 dark:bg-blue-950 dark:border-blue-900 dark:text-blue-200">
           <p className="font-semibold">Important Note:</p>
           <p>All reports will be reviewed before being made public to ensure quality and accuracy.</p>
         </div>
+
+        <Dialog open={showThankYou} onOpenChange={setShowThankYou}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center text-center justify-center gap-2">
+                <CheckCircle className="h-6 w-6 text-green-500" />
+                Report Submitted
+              </DialogTitle>
+              <DialogDescription className="text-center pt-2">
+                Thank you for your report! We will review the number/website shortly.
+                Your contribution helps keep the community safe.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-center mt-4">
+              <Button onClick={handleCloseThankYou} className="w-32">
+                OK
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

@@ -6,9 +6,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import RiskTag from '@/components/common/RiskTag';
 import ReportCard, { Report } from '@/components/common/ReportCard';
-import { AlertCircle, CheckCircle, Shield } from 'lucide-react';
+import { AlertCircle, CheckCircle, Shield, Info } from 'lucide-react';
 import { collection, query, where, getDocs, limit, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -39,6 +40,7 @@ const ScamCheck: React.FC = () => {
   const [matchedKeywords, setMatchedKeywords] = useState<string[]>([]);
   const [scamScore, setScamScore] = useState(0);
   const [similarReports, setSimilarReports] = useState<Report[]>([]);
+  const [isReportedButSafe, setIsReportedButSafe] = useState(false);
 
   // Pre-populate the text area if search query exists
   useEffect(() => {
@@ -51,6 +53,7 @@ const ScamCheck: React.FC = () => {
 
   const analyzeContent = async (textToAnalyze: string) => {
     setIsAnalyzing(true);
+    setIsReportedButSafe(false);
     const lowerCaseContent = textToAnalyze.toLowerCase();
     
     // Find matching high-risk keywords
@@ -83,8 +86,27 @@ const ScamCheck: React.FC = () => {
       calculatedRiskLevel = 'low';
     }
 
-    // Look for similar reports in Firestore
+    // Check if this has been reported but is currently safe
+    const isPhoneNumber = /^\+\d{1,3}\d{10}$/.test(textToAnalyze.replace(/\D/g, ''));
+    const isUrl = textToAnalyze.includes('http') || textToAnalyze.includes('www.');
+    
     try {
+      if (isPhoneNumber || isUrl) {
+        const reportsRef = collection(db, 'reports');
+        const q = query(
+          reportsRef,
+          where('contactInfo', '==', textToAnalyze),
+          where('status', '==', 'pending'),
+          limit(1)
+        );
+        
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty && calculatedRiskLevel === 'low') {
+          setIsReportedButSafe(true);
+        }
+      }
+
+      // Look for similar reports in Firestore
       const keywordsToSearch = [...highRiskMatches, ...mediumRiskMatches].slice(0, 5);
       const similarReportsData: Report[] = [];
       
@@ -218,6 +240,16 @@ const ScamCheck: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+        {isReportedButSafe && !isAnalyzing && (
+          <Alert className="bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950 dark:border-blue-900 dark:text-blue-200">
+            <Info className="h-5 w-5" />
+            <AlertTitle>Under Review</AlertTitle>
+            <AlertDescription>
+              This number/website has been reported but is currently marked safe. Please allow some time for review.
+            </AlertDescription>
+          </Alert>
+        )}
         
         {riskLevel !== null && !isAnalyzing && (
           <div className="space-y-6">
@@ -236,7 +268,7 @@ const ScamCheck: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <h3 className="text-sm font-medium mb-1 text-gray-500">Risk Level</h3>
+                  <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Risk Level</h3>
                   <div className="flex items-center">
                     <RiskTag level={riskLevel} />
                     <span className={`ml-3 text-lg font-semibold ${getScoreColor()}`}>
@@ -247,10 +279,10 @@ const ScamCheck: React.FC = () => {
                 
                 {matchedKeywords.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-medium mb-1 text-gray-500">Suspicious Indicators Found</h3>
+                    <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Suspicious Indicators Found</h3>
                     <div className="flex flex-wrap gap-2">
                       {matchedKeywords.map((keyword, index) => (
-                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
+                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full dark:bg-gray-800 dark:text-gray-200">
                           {keyword}
                         </span>
                       ))}
@@ -259,7 +291,7 @@ const ScamCheck: React.FC = () => {
                 )}
                 
                 <div>
-                  <h3 className="text-sm font-medium mb-1 text-gray-500">Recommended Actions</h3>
+                  <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Recommended Actions</h3>
                   <ul className="list-disc pl-5 space-y-1">
                     {getActionTips().map((tip, index) => (
                       <li key={index} className="text-sm">{tip}</li>
