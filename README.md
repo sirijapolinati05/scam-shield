@@ -2,49 +2,49 @@
 <<<<<<< HEAD
 # Welcome to ScamShield
 
-## Project info
+# 🚨 ScamShield
 
-**URL**: https://lovable.dev/projects/27cca8dd-5f27-4d5c-9e14-1bcea9c498a0
+**ScamShield** is a smart web application that helps users **detect**, **report**, and **explore** online scams. It uses advanced scam analysis, a reporting system, and Firebase integration to create a safe digital environment.
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## 🛠 Features
 
-**Use Lovable**
+- 🔍 **Scam Check** – Analyze messages, phone numbers, or URLs for scam risks.
+- 📢 **Report a Scam** – Submit scam details with a description and image.
+- 🗂️ **Scam Explorer** – Browse scams reported by others.
+- 👤 **User Profiles** – Sign up, log in, upload a profile photo and bio.
+- 🔐 **Secure Authentication** – Powered by Firebase Auth (Google or Email login).
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/27cca8dd-5f27-4d5c-9e14-1bcea9c498a0) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## 💻 Tech Stack
 
-**Use your preferred IDE**
+- **Frontend:** React, TypeScript, Tailwind CSS, shadcn/ui
+- **Backend & Auth:** Firebase (Firestore, Auth, Storage)
+- **Routing:** React Router v6
+- **State & UI:** Radix UI, Zustand (optional), Context API
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🚀 Getting Started
 
-Follow these steps:
+### Prerequisites
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- Node.js and npm installed
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Steps to Run Locally
 
-# Step 3: Install the necessary dependencies.
-npm i
+```bash
+# 1. Clone the repo
+git clone https://github.com/sirijapolinati05/scam-shield.git
+cd scam-shield
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 2. Install dependencies
+npm install
+
+# 3. Start the development server
 npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
 
 - Navigate to the main page of your repository.
 - Click on the "Code" button (green button) near the top right.
