@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +30,9 @@ interface ReportCardProps {
 
 const ReportCard: React.FC<ReportCardProps> = ({ report }) => {
   return (
-    <Card className="hover:shadow-md transition-shadow duration-300">
+    <Card
+      className="w-full transition-shadow duration-300 hover:shadow-lg cursor-pointer hover:scale-[1.02] transform"
+    >
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold truncate">{report.title}</CardTitle>

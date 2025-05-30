@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Input } from '@/components/ui/input';
@@ -274,23 +273,24 @@ const ScamExplorer: React.FC = () => {
                 <div className="h-3 bg-gray-200 rounded mb-2 w-full"></div>
                 <div className="h-3 bg-gray-200 rounded mb-3 w-5/6"></div>
                 <div className="flex gap-2">
-                  <div className="h-5 bg-gray-200 rounded w-16"></div>
-                  <div className="h-5 bg-gray-200 rounded w-24"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/6"></div>
                 </div>
               </div>
             ))}
           </div>
         ) : reports.length > 0 ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {reports.map((report) => (
                 <ReportCard key={report.id} report={report} />
               ))}
             </div>
-            
+
             {hasMore && (
               <div className="flex justify-center mt-6">
-                <Button 
+                <Button
                   variant="outline"
                   onClick={() => loadReports()}
                   disabled={loading}
@@ -301,9 +301,8 @@ const ScamExplorer: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="bg-gray-50 border rounded-lg p-8 text-center">
-            <h3 className="text-lg font-medium text-gray-900">No reports found</h3>
-            <p className="mt-2 text-gray-600">Try adjusting your filters or search criteria</p>
+          <div className="text-center text-muted-foreground">
+            No reports found.
           </div>
         )}
       </div>

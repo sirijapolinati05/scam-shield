@@ -16,7 +16,7 @@ import ReportCard, { Report } from '@/components/common/ReportCard';
 // Extend the Report type to include the additional fields used in this component
 interface ExtendedReport extends Report {
   contactInfo?: string;
-  screenshotUrl?: string;
+  screenshotUrls?: string[];
 }
 
 const ReportDetail: React.FC = () => {
@@ -47,7 +47,7 @@ const ReportDetail: React.FC = () => {
             timestamp: data.timestamp || Timestamp.now(),
             reporterName: data.reporterName,
             contactInfo: data.contactInfo,
-            screenshotUrl: data.screenshotUrl
+            screenshotUrls: data.screenshotUrls || (data.screenshotUrl ? [data.screenshotUrl] : [])
           });
           
           // Fetch similar reports
@@ -101,7 +101,8 @@ const ReportDetail: React.FC = () => {
           reportCount: 47,
           timestamp: Timestamp.now(),
           reporterName: 'Sample User',
-          contactInfo: 'https://fakescam.example.com'
+          contactInfo: 'https://fakescam.example.com',
+          screenshotUrls: []
         });
         
         setSimilarReports([
@@ -255,18 +256,30 @@ const ReportDetail: React.FC = () => {
             {report.contactInfo && (
               <div>
                 <h3 className="text-sm font-medium mb-2 text-gray-500">Related Phone/URL</h3>
-                <p className="text-gray-800">{report.contactInfo}</p>
+                <p className="text-gray-900 dark:text-white break-words">{report.contactInfo}</p>
               </div>
             )}
             
-            {report.screenshotUrl && (
+            {report.screenshotUrls && report.screenshotUrls.length > 0 && (
               <div>
-                <h3 className="text-sm font-medium mb-2 text-gray-500">Screenshot</h3>
-                <img 
-                  src={report.screenshotUrl} 
-                  alt="Scam screenshot" 
-                  className="border rounded-lg max-h-96 object-contain" 
-                />
+                <h3 className="text-sm font-medium mb-2 text-gray-500">Attached Screenshots</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {report.screenshotUrls.map((url, index) => (
+                    <a
+                      key={index}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      <img
+                        src={url}
+                        alt={`Attached screenshot ${index + 1}`}
+                        className="border rounded-lg max-h-96 object-contain w-full hover:opacity-80 transition-opacity"
+                      />
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>

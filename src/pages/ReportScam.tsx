@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -9,79 +8,76 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, updateDoc, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useToast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, X } from 'lucide-react';
 
 const ReportScam: React.FC = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('');
   const [contactInfo, setContactInfo] = useState('');
-  const [screenshot, setScreenshot] = useState<File | null>(null);
+  const [screenshots, setScreenshots] = useState<File[]>([]);
+  const [screenshotPreviews, setScreenshotPreviews] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
   const [showThankYou, setShowThankYou] = useState(false);
   const [contactInfoError, setContactInfoError] = useState<string | null>(null);
 
-  const validatePhoneNumber = (phoneNumber: string): boolean => {
-    // If empty, consider it valid (since it's optional)
-    if (!phoneNumber) return true;
-    
-    // Check if it starts with a country code (+ followed by 1-3 digits)
-    const hasCountryCode = /^\+\d{1,3}/.test(phoneNumber);
-    
-    if (!hasCountryCode) {
-      setContactInfoError("Please enter the phone number with a valid country code (e.g., +91, +1).");
+  const validateContactInfo = (info: string): boolean => {
+    if (!info) {
+      setContactInfoError("Please provide a phone number or website URL.");
       return false;
     }
-    
-    // Check if it has exactly 10 digits after the country code
-    const digitsAfterCode = phoneNumber.substring(phoneNumber.indexOf('+') + 1).replace(/\D/g, '');
-    const codeDigits = digitsAfterCode.length - 10;
-    
-    if (codeDigits < 0 || digitsAfterCode.length - codeDigits !== 10) {
-      setContactInfoError("Phone number must contain exactly 10 digits after the country code.");
+
+    const phonePattern = /^\+\d{1,3}\d{7,14}$/;
+    const urlPattern = /^https?:\/\/[^\s$.?#].[^\s]*$/i;
+
+    const isPhoneValid = phonePattern.test(info);
+    const isUrlValid = urlPattern.test(info);
+
+    if (!isPhoneValid && !isUrlValid) {
+      setContactInfoError("Please enter a valid phone number (e.g., +91xxxxxxxxxx) or a valid website URL (starting with http/https).");
       return false;
     }
-    
+
     setContactInfoError(null);
     return true;
   };
 
   const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setScreenshot(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setScreenshotPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setScreenshots(prev => [...prev, ...newFiles]);
+
+      const newPreviews = newFiles.map(file => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        return new Promise<string>(resolve => {
+          reader.onloadend = () => resolve(reader.result as string);
+        });
+      });
+
+      Promise.all(newPreviews).then(results => {
+        setScreenshotPreviews(prev => [...prev, ...results]);
+      });
     }
   };
 
-  const handleContactInfoChange = (value: string) => {
-    setContactInfo(value);
-    if (value && (value.includes('+') || value.match(/\d{10}/))) {
-      validatePhoneNumber(value);
-    } else {
-      setContactInfoError(null);
-    }
+  const handleRemoveScreenshot = (index: number) => {
+    setScreenshots(prev => prev.filter((_, i) => i !== index));
+    setScreenshotPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!currentUser) {
       toast({
         title: "Authentication required",
@@ -91,7 +87,7 @@ const ReportScam: React.FC = () => {
       navigate('/login');
       return;
     }
-    
+
     if (!title || !content || !category) {
       toast({
         title: "Missing information",
@@ -100,16 +96,15 @@ const ReportScam: React.FC = () => {
       });
       return;
     }
-    
-    // Validate contact info if it's a phone number
-    if (contactInfo && !validatePhoneNumber(contactInfo)) {
+
+    if (!validateContactInfo(contactInfo)) {
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+    setShowThankYou(true);
+
     try {
-      // Prepare report data
       const reportData: any = {
         title,
         content,
@@ -118,33 +113,41 @@ const ReportScam: React.FC = () => {
         reporterId: currentUser.uid,
         reporterName: currentUser.displayName || 'Anonymous',
         reportCount: 1,
-        // Default to medium risk, can be updated later via moderation
         riskLevel: 'medium',
         timestamp: serverTimestamp(),
-        status: 'pending' // For moderation purposes
+        status: 'pending',  // <-- default status on report creation
+        hasScreenshots: screenshots.length > 0
       };
-      
-      // If screenshot provided, upload it first
-      if (screenshot) {
-        const storageRef = ref(storage, `screenshots/${Date.now()}_${screenshot.name}`);
-        const uploadResult = await uploadBytes(storageRef, screenshot);
-        const downloadURL = await getDownloadURL(uploadResult.ref);
-        reportData.screenshotUrl = downloadURL;
+
+      const reportRef = await addDoc(collection(db, 'reports'), reportData);
+
+      if (screenshots.length > 0) {
+        const screenshotUrls = await Promise.all(
+          screenshots.map(async (screenshot, index) => {
+            const storageRef = ref(storage, `screenshots/${reportRef.id}_${index}_${screenshot.name}`);
+            const uploadResult = await uploadBytes(storageRef, screenshot);
+            return getDownloadURL(uploadResult.ref);
+          })
+        );
+
+        await updateDoc(doc(db, 'reports', reportRef.id), { screenshotUrls });
       }
-      
-      // Save report to Firestore
-      const docRef = await addDoc(collection(db, 'reports'), reportData);
-      
-      // Show thank you dialog instead of toast
-      setShowThankYou(true);
-      
-    } catch (error) {
+
+      setTitle('');
+      setContent('');
+      setCategory('');
+      setContactInfo('');
+      setScreenshots([]);
+      setScreenshotPreviews([]);
+
+    } catch (error: any) {
       console.error("Error submitting report:", error);
       toast({
         title: "Error",
-        description: "Failed to submit report. Please try again.",
+        description: `Failed to submit report: ${error.message}`,
         variant: "destructive"
       });
+      setShowThankYou(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -152,7 +155,6 @@ const ReportScam: React.FC = () => {
 
   const handleCloseThankYou = () => {
     setShowThankYou(false);
-    // Navigate to home or reports list
     navigate('/');
   };
 
@@ -160,7 +162,7 @@ const ReportScam: React.FC = () => {
     <Layout requireAuth={true}>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Report a Scam</h1>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Submit a New Scam Report</CardTitle>
@@ -180,7 +182,7 @@ const ReportScam: React.FC = () => {
                   required
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="category">Category <span className="text-red-500">*</span></Label>
                 <Select value={category} onValueChange={setCategory} required>
@@ -189,69 +191,80 @@ const ReportScam: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="job">Job Scam</SelectItem>
-                    <SelectItem value="banking">OTP/Banking</SelectItem>
+                    <SelectItem value="banking">Banking/OTP Scam</SelectItem>
                     <SelectItem value="website">Fake Website</SelectItem>
-                    <SelectItem value="lottery">Lottery/Giveaway</SelectItem>
-                    <SelectItem value="betting">Betting App</SelectItem>
                     <SelectItem value="shopping">Shopping Scam</SelectItem>
                     <SelectItem value="investment">Investment Scam</SelectItem>
+                    <SelectItem value="betting">Betting App</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="content">Scam Content <span className="text-red-500">*</span></Label>
                 <Textarea
                   id="content"
-                  placeholder="Paste the full message, describe the scam in detail, or provide the website URL"
+                  placeholder="Describe the scam in detail or paste the full message"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   required
                   className="min-h-32"
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="contactInfo">Related Phone/URL (Optional)</Label>
+                <Label htmlFor="contactInfo">Phone Number or URL <span className="text-red-500">*</span></Label>
                 <Input
                   id="contactInfo"
-                  placeholder="Phone number with country code (e.g., +91xxxxxxxxxx) or website URL"
+                  placeholder="e.g., +91xxxxxxxxxx or https://example.com"
                   value={contactInfo}
-                  onChange={(e) => handleContactInfoChange(e.target.value)}
+                  onChange={(e) => setContactInfo(e.target.value)}
                 />
                 {contactInfoError && (
                   <p className="text-sm text-red-500 mt-1">{contactInfoError}</p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="screenshot">Screenshot (Optional)</Label>
+                <Label htmlFor="screenshots">Screenshots (Optional)</Label>
                 <Input
-                  id="screenshot"
+                  id="screenshots"
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handleScreenshotChange}
                 />
-                
-                {screenshotPreview && (
-                  <div className="mt-2">
-                    <img 
-                      src={screenshotPreview} 
-                      alt="Screenshot preview" 
-                      className="max-h-40 border rounded"
-                    />
+                {screenshotPreviews.length > 0 && (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {screenshotPreviews.map((preview, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={preview}
+                          alt={`Screenshot preview ${index + 1}`}
+                          className="max-h-40 border rounded"
+                        />
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6"
+                          onClick={() => handleRemoveScreenshot(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-              
+
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? 'Submitting...' : 'Submit Report'}
               </Button>
             </form>
           </CardContent>
         </Card>
-        
+
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 dark:bg-blue-950 dark:border-blue-900 dark:text-blue-200">
           <p className="font-semibold">Important Note:</p>
           <p>All reports will be reviewed before being made public to ensure quality and accuracy.</p>
@@ -261,19 +274,19 @@ const ReportScam: React.FC = () => {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center text-center justify-center gap-2">
-                <CheckCircle className="h-6 w-6 text-green-500" />
-                Report Submitted
+                <CheckCircle className="h-6 w-6 text-green-600" />
+                <span>Thank you for your report!</span>
               </DialogTitle>
-              <DialogDescription className="text-center pt-2">
-                Thank you for your report! We will review the number/website shortly.
-                Your contribution helps keep the community safe.
+              <DialogDescription>
+                Your scam report has been submitted successfully. It will be reviewed and approved shortly.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex justify-center mt-4">
-              <Button onClick={handleCloseThankYou} className="w-32">
-                OK
-              </Button>
-            </div>
+            <Button
+              onClick={handleCloseThankYou}
+              className="mt-4 w-full"
+            >
+              Close
+            </Button>
           </DialogContent>
         </Dialog>
       </div>
