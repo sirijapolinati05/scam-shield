@@ -214,7 +214,7 @@ const ReportScam: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contactInfo">Phone Number or URL <span className="text-red-500">*</span></Label>
+                <Label htmlFor="contactInfo">Scammed Phone Number or URL <span className="text-red-500">*</span></Label>
                 <Input
                   id="contactInfo"
                   placeholder="e.g., +91xxxxxxxxxx or https://example.com"
