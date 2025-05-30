@@ -1,6 +1,6 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
-# Welcome to your Lovable project
+# Welcome to ScamShield
 
 ## Project info
 
