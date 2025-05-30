@@ -46,7 +46,6 @@ const ScamCheck: React.FC = () => {
 
   const formatPhoneNumber = (phoneNumber: string) => {
     const cleaned = phoneNumber.replace(/\D/g, '');
-    
     if (cleaned.length === 10) {
       return cleaned.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
     } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
@@ -56,14 +55,53 @@ const ScamCheck: React.FC = () => {
       const number = cleaned.substring(cleaned.length - 10);
       return `+${countryCode} (${number.substring(0, 3)}) ${number.substring(3, 6)}-${number.substring(6)}`;
     }
-    
     return phoneNumber;
+  };
+
+  const normalizeUrl = (url: string, preserveFragment: boolean = false) => {
+    try {
+      let normalized = url.toLowerCase().trim();
+      // Add https:// if no protocol is specified
+      if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+        normalized = `https://${normalized}`;
+      }
+      const urlObj = new URL(normalized);
+      // Remove www. and optionally preserve fragment
+      let result = urlObj.hostname.replace(/^www\./, '') + urlObj.pathname.replace(/\/+$/, '');
+      if (preserveFragment && urlObj.hash) {
+        result += urlObj.hash;
+      }
+      return result;
+    } catch (e) {
+      return url.toLowerCase().trim();
+    }
+  };
+
+  const generateUrlFormats = (url: string) => {
+    const normalized = normalizeUrl(url);
+    const normalizedWithFragment = normalizeUrl(url, true);
+    const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
+    const hostname = urlObj.hostname.replace(/^www\./, '');
+    const formats = [
+      normalized,
+      normalizedWithFragment,
+      `http://${normalized}`,
+      `https://${normalized}`,
+      `www.${normalized}`,
+      `http://www.${normalized}`,
+      `https://www.${normalized}`,
+      normalized.replace(/^[^/]+/, ''), // Path only
+      url.toLowerCase().trim(), // Original input
+      hostname, // Hostname only
+      `https://${hostname}/#/`, // Specific format from Firebase
+      `www.${hostname}/#/`, // Specific format with www
+    ];
+    return [...new Set(formats)];
   };
 
   const validatePhoneNumber = (input: string) => {
     const cleanedNumber = input.replace(/\D/g, '');
     const isPhoneNumber = /^\+?\d+$/.test(input);
-    
     if (isPhoneNumber) {
       if (cleanedNumber.length < 10) {
         return 'Phone number must be at least 10 digits';
@@ -72,14 +110,31 @@ const ScamCheck: React.FC = () => {
       }
       return '';
     }
-    
     return '';
+  };
+
+  const validateUrl = (input: string) => {
+    try {
+      new URL(input.startsWith('http') ? input : `https://${input}`);
+      return '';
+    } catch (e) {
+      return 'Invalid URL format';
+    }
   };
 
   const isValidPhoneNumber = (input: string) => {
     const cleanedNumber = input.replace(/\D/g, '');
     const isPhoneNumber = /^\+?\d+$/.test(input);
     return isPhoneNumber && cleanedNumber.length >= 10 && cleanedNumber.length <= 15;
+  };
+
+  const isValidUrl = (input: string) => {
+    try {
+      new URL(input.startsWith('http') ? input : `https://${input}`);
+      return true;
+    } catch (e) {
+      return false;
+    }
   };
 
   const extractMainPhoneNumber = (input: string) => {
@@ -91,7 +146,7 @@ const ScamCheck: React.FC = () => {
   };
 
   const generatePhoneNumberFormats = (cleanedNumber: string) => {
-    const mainNumber = cleanedNumber.length >= 10 ? cleanedNumber.substring(cleanedNumber.length - 10) : cleanedNumber;
+    const mainNumber = cleanedNumber.length >= 10 ? cleanedNumber.substring(cleaned.length - 10) : cleanedNumber;
     const formats = [
       cleanedNumber,
       mainNumber,
@@ -133,6 +188,17 @@ const ScamCheck: React.FC = () => {
           });
           return;
         }
+      } else if (isValidUrl(queryParam)) {
+        const error = validateUrl(queryParam);
+        if (error) {
+          setInputError(error);
+          toast({
+            title: "Invalid URL",
+            description: error,
+            variant: "destructive"
+          });
+          return;
+        }
       }
       analyzeContent(queryParam);
     }
@@ -150,47 +216,61 @@ const ScamCheck: React.FC = () => {
         });
         return;
       }
+    } else if (isValidUrl(textToAnalyze)) {
+      const error = validateUrl(textToAnalyze);
+      if (error) {
+        setInputError(error);
+        toast({
+          title: "Invalid URL",
+          description: error,
+          variant: "destructive"
+        });
+        return;
+      }
     }
-    
+
     setInputError('');
     setIsAnalyzing(true);
     setIsReportedButSafe(false);
     setReportStatus(null);
     const lowerCaseContent = textToAnalyze.toLowerCase();
     const isPhoneNumber = isValidPhoneNumber(textToAnalyze);
-    const isUrl = textToAnalyze.includes('http') || textToAnalyze.includes('www.');
-    
+    const isUrl = isValidUrl(textToAnalyze);
+
     let approvedReportsData: Report[] = [];
     let pendingReportsData: Report[] = [];
-    
+
     try {
-      if (isPhoneNumber) {
-        const cleanedNumber = textToAnalyze.replace(/\D/g, '');
-        const numbersToSearch = generatePhoneNumberFormats(cleanedNumber);
-        
-        console.log('Searching phone numbers:', numbersToSearch);
-        
+      if (isPhoneNumber || isUrl) {
+        const formats = isPhoneNumber
+          ? generatePhoneNumberFormats(textToAnalyze.replace(/\D/g, ''))
+          : generateUrlFormats(textToAnalyze);
+
+        console.log('Searching formats:', formats);
+
         const reportsRef = collection(db, 'reports');
-        for (const numberFormat of numbersToSearch) {
-          const phoneQuery = query(
+        for (const format of formats) {
+          console.log(`Querying contactInfo: ${format}`);
+          const q = query(
             reportsRef,
-            where('contactInfo', '==', numberFormat),
+            where('contactInfo', '==', format),
             limit(10)
           );
-          
-          const phoneQuerySnapshot = await getDocs(phoneQuery);
-          
-          phoneQuerySnapshot.forEach(doc => {
+
+          const querySnapshot = await getDocs(q);
+
+          querySnapshot.forEach(doc => {
             const data = doc.data();
+            console.log(`Found report for contactInfo: ${data.contactInfo}, status: ${data.status}`);
             const report = {
               id: doc.id,
-              title: data.title || 'Phone Scam Report',
-              content: data.content || 'Scam reported for this phone number',
-              category: data.category || 'Phone Scam',
+              title: data.title || (isPhoneNumber ? 'Phone Scam Report' : 'Website Scam Report'),
+              content: data.content || `Scam reported for this ${isPhoneNumber ? 'phone number' : 'website'}`,
+              category: data.category || (isPhoneNumber ? 'Phone Scam' : 'Website Scam'),
               riskLevel: data.riskLevel || 'high',
               reportCount: data.reportCount || 1,
               timestamp: data.timestamp || Timestamp.now(),
-              status: data.status || 'pending'
+              status: data.status?.trim() || 'pending' // Trim status to handle extra spaces
             };
             if (report.status === 'approved' && !approvedReportsData.find(r => r.id === doc.id)) {
               approvedReportsData.push(report);
@@ -198,56 +278,57 @@ const ScamCheck: React.FC = () => {
               pendingReportsData.push(report);
             }
           });
-          
+
           if (approvedReportsData.length + pendingReportsData.length >= 10) break;
         }
-        
-        console.log('Found phone reports:', { approved: approvedReportsData, pending: pendingReportsData });
-      } else if (isUrl) {
-        console.log('Checking for URL reports:', textToAnalyze);
-        
-        const reportsRef = collection(db, 'reports');
-        const urlQuery = query(
-          reportsRef,
-          where('contactInfo', '==', textToAnalyze),
-          limit(10)
-        );
-        
-        const urlQuerySnapshot = await getDocs(urlQuery);
-        
-        urlQuerySnapshot.forEach(doc => {
-          const data = doc.data();
-          const report = {
-            id: doc.id,
-            title: data.title || 'Website Scam Report',
-            content: data.content || 'Scam reported for this website',
-            category: data.category || 'Website Scam',
-            riskLevel: data.riskLevel || 'high',
-            reportCount: data.reportCount || 1,
-            timestamp: data.timestamp || Timestamp.now(),
-            status: data.status || 'pending'
-          };
-          if (report.status === 'approved' && !approvedReportsData.find(r => r.id === doc.id)) {
-            approvedReportsData.push(report);
-          } else if (report.status === 'pending' && !pendingReportsData.find(r => r.id === doc.id)) {
-            pendingReportsData.push(report);
-          }
-        });
-        
-        console.log('Found URL reports:', { approved: approvedReportsData, pending: pendingReportsData });
+
+        // Fallback query for URLs: partial match on hostname
+        if (isUrl && approvedReportsData.length === 0 && pendingReportsData.length === 0) {
+          const normalized = normalizeUrl(textToAnalyze);
+          const hostname = normalized.split('/')[0];
+          console.log(`Fallback query for hostname: ${hostname}`);
+          const fallbackQuery = query(
+            reportsRef,
+            where('contactInfo', '>=', hostname),
+            where('contactInfo', '<=', hostname + '\uf8ff'),
+            limit(5)
+          );
+          const fallbackSnapshot = await getDocs(fallbackQuery);
+          fallbackSnapshot.forEach(doc => {
+            const data = doc.data();
+            console.log(`Fallback report found: ${data.contactInfo}, status: ${data.status}`);
+            const report = {
+              id: doc.id,
+              title: data.title || 'Website Scam Report',
+              content: data.content || 'Scam reported for this website',
+              category: data.category || 'Website Scam',
+              riskLevel: data.riskLevel || 'high',
+              reportCount: data.reportCount || 1,
+              timestamp: data.timestamp || Timestamp.now(),
+              status: data.status?.trim() || 'pending'
+            };
+            if (report.status === 'approved' && !approvedReportsData.find(r => r.id === doc.id)) {
+              approvedReportsData.push(report);
+            } else if (report.status === 'pending' && !pendingReportsData.find(r => r.id === doc.id)) {
+              pendingReportsData.push(report);
+            }
+          });
+        }
+
+        console.log('Final reports:', { approved: approvedReportsData, pending: pendingReportsData });
       } else {
-        const highRiskMatches = scamKeywords.high.filter(keyword => 
+        const highRiskMatches = scamKeywords.high.filter(keyword =>
           lowerCaseContent.includes(keyword.toLowerCase())
         );
-        const mediumRiskMatches = scamKeywords.medium.filter(keyword => 
+        const mediumRiskMatches = scamKeywords.medium.filter(keyword =>
           lowerCaseContent.includes(keyword.toLowerCase())
         );
-        
+
         const keywordsToSearch = [...highRiskMatches, ...mediumRiskMatches].slice(0, 5);
-        
+
         if (keywordsToSearch.length > 0) {
           const reportsRef = collection(db, 'reports');
-          
+
           for (const keyword of keywordsToSearch) {
             const keywordQuery = query(
               reportsRef,
@@ -255,9 +336,9 @@ const ScamCheck: React.FC = () => {
               where('content', '<=', keyword + '\uf8ff'),
               limit(3)
             );
-            
+
             const keywordQuerySnapshot = await getDocs(keywordQuery);
-            
+
             keywordQuerySnapshot.forEach(doc => {
               const data = doc.data();
               const report = {
@@ -268,7 +349,7 @@ const ScamCheck: React.FC = () => {
                 riskLevel: data.riskLevel || 'medium',
                 reportCount: data.reportCount || 1,
                 timestamp: data.timestamp || Timestamp.now(),
-                status: data.status || 'pending'
+                status: data.status?.trim() || 'pending'
               };
               if (report.status === 'approved' && !approvedReportsData.find(r => r.id === doc.id)) {
                 approvedReportsData.push(report);
@@ -278,23 +359,23 @@ const ScamCheck: React.FC = () => {
             });
           }
         }
-        
+
         setMatchedKeywords([...highRiskMatches, ...mediumRiskMatches]);
       }
-      
+
       setApprovedReports(approvedReportsData);
       setPendingReports(pendingReportsData);
       setReportStatus(approvedReportsData.length > 0 ? 'approved' : pendingReportsData.length > 0 ? 'pending' : null);
-      
+
       let calculatedRiskLevel: RiskLevel;
       let calculatedScore = 0;
-      
+
       if (approvedReportsData.length > 0) {
         const highRiskReports = approvedReportsData.filter(r => r.riskLevel === 'high').length;
         const mediumRiskReports = approvedReportsData.filter(r => r.riskLevel === 'medium').length;
-        
+
         calculatedScore = Math.min((highRiskReports * 30) + (mediumRiskReports * 15) + (approvedReportsData.length * 10), 100);
-        
+
         if (highRiskReports > 0 || calculatedScore >= 50) {
           calculatedRiskLevel = 'high';
         } else if (mediumRiskReports > 0 || calculatedScore >= 20) {
@@ -306,10 +387,10 @@ const ScamCheck: React.FC = () => {
         calculatedRiskLevel = 'low';
         calculatedScore = 0;
       }
-      
+
       setScamScore(calculatedScore);
       setRiskLevel(calculatedRiskLevel);
-      
+
     } catch (error) {
       console.error("Error searching for reports:", error);
       setApprovedReports([]);
@@ -317,8 +398,13 @@ const ScamCheck: React.FC = () => {
       setRiskLevel('low');
       setScamScore(0);
       setReportStatus(null);
+      toast({
+        title: "Error",
+        description: "Failed to fetch reports. Please try again later.",
+        variant: "destructive"
+      });
     }
-    
+
     setTimeout(() => {
       setIsAnalyzing(false);
     }, 1500);
@@ -363,7 +449,8 @@ const ScamCheck: React.FC = () => {
 
   const renderNoReportsUI = () => {
     const isPhoneNumber = isValidPhoneNumber(content);
-    
+    const isUrl = isValidUrl(content);
+
     return (
       <Card className="border-l-4 border-l-green-600">
         <CardHeader>
@@ -379,16 +466,16 @@ const ScamCheck: React.FC = () => {
             </div>
             <div>
               <p className="text-lg font-medium">
-                {isPhoneNumber 
+                {isPhoneNumber
                   ? `The phone number ${formatPhoneNumber(content)} has no reported scams based on our records.`
-                  : `The URL ${content} has no reported scams based on our records.`}
+                  : `The URL ${normalizeUrl(content)} has no reported scams based on our records.`}
               </p>
               <p className="text-gray-500 dark:text-gray-400">
                 We haven't found any reported scams associated with this {isPhoneNumber ? 'phone number' : 'URL'}.
               </p>
             </div>
           </div>
-          
+
           <div>
             <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Stay vigilant</h3>
             <ul className="list-disc pl-5 space-y-1">
@@ -404,7 +491,8 @@ const ScamCheck: React.FC = () => {
 
   const renderPendingReportsUI = () => {
     const isPhoneNumber = isValidPhoneNumber(content);
-    
+    const isUrl = isValidUrl(content);
+
     return (
       <div className="space-y-6">
         <Card className="border-l-4 border-l-amber-600">
@@ -421,16 +509,16 @@ const ScamCheck: React.FC = () => {
               </div>
               <div>
                 <p className="text-lg font-medium">
-                  {isPhoneNumber 
+                  {isPhoneNumber
                     ? `The phone number ${formatPhoneNumber(content)} is reported as a scam based on our records but is still in pending status.`
-                    : `The URL ${content} is reported as a scam based on our records but is still in pending status.`}
+                    : `The URL ${normalizeUrl(content)} is reported as a scam based on our records but is still in pending status.`}
                 </p>
                 <p className="text-gray-500 dark:text-gray-400">
                   This {isPhoneNumber ? 'phone number' : 'URL'} needs to be verified.
                 </p>
               </div>
             </div>
-            
+
             <div>
               <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Recommended Actions</h3>
               <ul className="list-disc pl-5 space-y-1">
@@ -439,11 +527,11 @@ const ScamCheck: React.FC = () => {
                 <li>Consider reporting additional details to help verification</li>
               </ul>
             </div>
-            
+
             <div className="flex justify-end">
-              <Button 
-                variant="outline" 
-                className="bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100 dark:bg-amber-950 dark:border-amber-900 dark:text-amber-400" 
+              <Button
+                variant="outline"
+                className="bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100 dark:bg-amber-950 dark:border-amber-900 dark:text-amber-400"
                 onClick={() => window.location.href = '/report'}
               >
                 Report Additional Details
@@ -470,7 +558,8 @@ const ScamCheck: React.FC = () => {
 
   const renderScamResult = () => {
     const isPhoneNumber = isValidPhoneNumber(content);
-    
+    const isUrl = isValidUrl(content);
+
     return (
       <Card className={`border-l-4 ${riskLevel === 'high' ? 'border-l-red-600' : 'border-l-amber-600'}`}>
         <CardHeader>
@@ -491,7 +580,7 @@ const ScamCheck: React.FC = () => {
               This {isPhoneNumber ? 'phone number' : 'URL'} has been reported {approvedReports.length} {approvedReports.length === 1 ? 'time' : 'times'} for scams.
             </p>
           </div>
-          
+
           {matchedKeywords.length > 0 && (
             <div>
               <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Suspicious Indicators Found</h3>
@@ -504,7 +593,7 @@ const ScamCheck: React.FC = () => {
               </div>
             </div>
           )}
-          
+
           <div>
             <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Recommended Actions</h3>
             <ul className="list-disc pl-5 space-y-1">
@@ -513,11 +602,11 @@ const ScamCheck: React.FC = () => {
               ))}
             </ul>
           </div>
-          
+
           <div className="flex justify-end">
-            <Button 
-              variant="outline" 
-              className="bg-red-50 border-red-200 text-red-600 hover:bg-red-100 dark:bg-red-950 dark:border-red-900 dark:text-red-400" 
+            <Button
+              variant="outline"
+              className="bg-red-50 border-red-200 text-red-600 hover:bg-red-100 dark:bg-red-950 dark:border-red-900 dark:text-red-400"
               onClick={() => window.location.href = '/report'}
             >
               Report Additional Details
@@ -525,12 +614,13 @@ const ScamCheck: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-    );  
+    );
   };
 
   const renderReportsFoundUI = () => {
     const isPhoneNumber = isValidPhoneNumber(content);
-    
+    const isUrl = isValidUrl(content);
+
     return (
       <div className="space-y-6">
         <div>
@@ -538,11 +628,11 @@ const ScamCheck: React.FC = () => {
             {isPhoneNumber ? 'Phone Number Scam Check' : 'URL Scam Check'}
           </h1>
           <div className="bg-gray-900 text-white p-4 rounded-lg font-mono">
-            {isPhoneNumber ? formatPhoneNumber(content) : content}
+            {isPhoneNumber ? formatPhoneNumber(content) : normalizeUrl(content)}
           </div>
         </div>
 
-        <Button 
+        <Button
           onClick={() => analyzeContent(content)}
           disabled={isAnalyzing}
           className="bg-gray-600 hover:bg-gray-700 text-white"
@@ -578,11 +668,11 @@ const ScamCheck: React.FC = () => {
         ) : (
           <>
             <h1 className="text-2xl font-bold">Scam Check</h1>
-            
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="relative">
-                <Textarea 
-                  placeholder="Enter any Phone number or URL to check for scams" 
+                <Textarea
+                  placeholder="Enter any Phone number or URL to check for scams..."
                   className={`min-h-32 ${inputError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   value={content}
                   onChange={(e) => {
@@ -597,15 +687,15 @@ const ScamCheck: React.FC = () => {
                   </div>
                 )}
               </div>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={!content.trim() || isAnalyzing || !!inputError}
                 className="w-full sm:w-auto"
               >
                 {isAnalyzing ? 'Analyzing...' : 'Check Now'}
               </Button>
             </form>
-            
+
             {isAnalyzing && (
               <Card>
                 <CardHeader>
@@ -629,7 +719,7 @@ const ScamCheck: React.FC = () => {
                 </AlertDescription>
               </Alert>
             )}
-            
+
             {riskLevel !== null && !isAnalyzing && (
               <div className="space-y-6">
                 {reportStatus === 'approved' && approvedReports.length > 0 ? (

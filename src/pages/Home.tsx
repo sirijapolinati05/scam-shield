@@ -154,7 +154,7 @@ const Home: React.FC = () => {
             <div className="relative w-full">
               <Input
                 type="text"
-                placeholder="Paste message, URL, or phone number to check..."
+                placeholder="Enter any phone number or URL to check for scams..."
                 value={searchInput}
                 onChange={(e) => {
                   setSearchInput(e.target.value);
